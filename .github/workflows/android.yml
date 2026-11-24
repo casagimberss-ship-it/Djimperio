@@ -2,13 +2,15 @@ name: Compilacion manual - IMPERIO DJ PRO
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Preparar proyecto y generar APK
+    name: Compilar y generar APK
     runs-on: ubuntu-latest
 
     steps:
@@ -24,22 +26,15 @@ jobs:
             ZIP_FILE="$(find . -maxdepth 4 -type f -iname '*.zip' -print -quit)"
             if [[ -z "$ZIP_FILE" ]]; then
               echo "::error::No se encontro settings.gradle(.kts) ni un ZIP del proyecto."
-              echo "Sube el ZIP del proyecto o extrae su contenido en la raiz del repositorio."
               exit 1
             fi
 
-            echo "Extrayendo proyecto desde: $ZIP_FILE"
             mkdir -p /tmp/imperio-source
             unzip -q "$ZIP_FILE" -d /tmp/imperio-source
 
-            SETTINGS_FILE="$(find /tmp/imperio-source -type f -name settings.gradle.kts -print -quit)"
+            SETTINGS_FILE="$(find /tmp/imperio-source -type f \\( -name settings.gradle.kts -o -name settings.gradle \\) -print -quit)"
             if [[ -z "$SETTINGS_FILE" ]]; then
-              SETTINGS_FILE="$(find /tmp/imperio-source -type f -name settings.gradle -print -quit)"
-            fi
-
-            if [[ -z "$SETTINGS_FILE" ]]; then
-              echo "::error::El ZIP no contiene settings.gradle.kts ni settings.gradle."
-              echo "Comprueba que subiste IMPERIO_DJ_PRO_V1_SOURCE.zip completo."
+              echo "::error::El ZIP no contiene settings.gradle(.kts)."
               exit 1
             fi
 
@@ -49,13 +44,11 @@ jobs:
 
           if [[ ! -f app/build.gradle.kts && ! -f app/build.gradle ]]; then
             echo "::error::No se encontro app/build.gradle(.kts)."
-            echo "La estructura Android debe contener settings.gradle(.kts) y app/."
-            echo "Contenido de la raiz:"
             ls -la
             exit 1
           fi
 
-          echo "Proyecto Android detectado correctamente:"
+          echo "Proyecto detectado correctamente."
           ls -la
           ls -la app
 
@@ -65,13 +58,21 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Configurar Gradle 8.9
+      - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Compilar APK Debug
-        run: gradle assembleDebug --stacktrace
+        run: gradle --no-daemon clean assembleDebug --stacktrace
+
+      - name: Verificar APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          ls -lh "$APK"
 
       - name: Publicar APK
         uses: actions/upload-artifact@v4
@@ -80,3 +81,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+          
