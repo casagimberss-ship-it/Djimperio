@@ -20,36 +20,42 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Si el proyecto no esta extraido en la raiz, buscar el ZIP subido al repositorio.
-          if [[ ! -f "settings.gradle.kts" && ! -f "settings.gradle" ]]; then
-            ZIP_FILE="$(find . -maxdepth 3 -type f -iname '*.zip' -print -quit)"
-            if [[ -z "${ZIP_FILE}" ]]; then
+          if [[ ! -f settings.gradle.kts && ! -f settings.gradle ]]; then
+            ZIP_FILE="$(find . -maxdepth 4 -type f -iname '*.zip' -print -quit)"
+            if [[ -z "$ZIP_FILE" ]]; then
               echo "::error::No se encontro settings.gradle(.kts) ni un ZIP del proyecto."
-              echo "Extrae IMPERIO_DJ_PRO_V1_SOURCE.zip en la raiz del repositorio o sube el ZIP."
+              echo "Sube el ZIP del proyecto o extrae su contenido en la raiz del repositorio."
               exit 1
             fi
 
-            echo "Extrayendo: ${ZIP_FILE}"
+            echo "Extrayendo proyecto desde: $ZIP_FILE"
             mkdir -p /tmp/imperio-source
-            unzip -q "${ZIP_FILE}" -d /tmp/imperio-source
+            unzip -q "$ZIP_FILE" -d /tmp/imperio-source
 
-            SETTINGS_FILE="$(find /tmp/imperio-source -type f \\( -name settings.gradle.kts -o -name settings.gradle \\) -print -quit)"
-            if [[ -z "${SETTINGS_FILE}" ]]; then
-              echo "::error::El ZIP no contiene settings.gradle ni settings.gradle.kts."
+            SETTINGS_FILE="$(find /tmp/imperio-source -type f -name settings.gradle.kts -print -quit)"
+            if [[ -z "$SETTINGS_FILE" ]]; then
+              SETTINGS_FILE="$(find /tmp/imperio-source -type f -name settings.gradle -print -quit)"
+            fi
+
+            if [[ -z "$SETTINGS_FILE" ]]; then
+              echo "::error::El ZIP no contiene settings.gradle.kts ni settings.gradle."
+              echo "Comprueba que subiste IMPERIO_DJ_PRO_V1_SOURCE.zip completo."
               exit 1
             fi
 
-            PROJECT_ROOT="$(dirname "${SETTINGS_FILE}")"
-            cp -a "${PROJECT_ROOT}/." .
+            PROJECT_ROOT="$(dirname "$SETTINGS_FILE")"
+            cp -a "$PROJECT_ROOT/." .
           fi
 
-          if [[ ! -f "app/build.gradle.kts" && ! -f "app/build.gradle" ]]; then
-            echo "::error::No se encontro la carpeta app con su archivo build.gradle."
-            echo "Verifica que el proyecto Android este en la raiz del repositorio."
+          if [[ ! -f app/build.gradle.kts && ! -f app/build.gradle ]]; then
+            echo "::error::No se encontro app/build.gradle(.kts)."
+            echo "La estructura Android debe contener settings.gradle(.kts) y app/."
+            echo "Contenido de la raiz:"
+            ls -la
             exit 1
           fi
 
-          echo "Estructura Gradle encontrada:"
+          echo "Proyecto Android detectado correctamente:"
           ls -la
           ls -la app
 
